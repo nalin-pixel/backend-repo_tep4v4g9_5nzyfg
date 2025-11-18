@@ -1,48 +1,70 @@
 """
-Database Schemas
+Database Schemas for WhatsApp-style MVP
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
+Each Pydantic model corresponds to a MongoDB collection where the
+collection name is the lowercase of the class name.
 
-Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
+- User -> user
+- Session -> session
+- Verification -> verification
+- Message -> message
+- Contact -> contact
+- DeviceKey -> devicekey (optional future use for E2E)
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
+from datetime import datetime
 
-# Example schemas (replace with your own):
 
 class User(BaseModel):
-    """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
-    """
-    name: str = Field(..., description="Full name")
-    email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
-    is_active: bool = Field(True, description="Whether user is active")
+    phone: str = Field(..., description="E.164 formatted phone number")
+    name: str = Field(..., description="Display name")
+    photo_url: Optional[str] = Field(None, description="Profile photo URL")
+    about: Optional[str] = Field(None, description="About text")
 
-class Product(BaseModel):
-    """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
-    """
-    title: str = Field(..., description="Product title")
-    description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
 
-# Add your own schemas here:
-# --------------------------------------------------
+class Session(BaseModel):
+    user_id: str = Field(..., description="Owner user id")
+    token: str = Field(..., description="Opaque session token")
+    expires_at: datetime = Field(..., description="Expiry timestamp (UTC)")
 
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+
+class Verification(BaseModel):
+    phone: str = Field(..., description="Phone being verified")
+    code: str = Field(..., description="6-digit OTP code")
+    expires_at: datetime = Field(..., description="Expiry timestamp (UTC)")
+    attempts: int = Field(0, description="Number of attempts made")
+
+
+class Message(BaseModel):
+    sender_id: str = Field(...)
+    recipient_id: str = Field(...)
+    text: Optional[str] = Field(None, description="Plaintext body (dev-only)")
+    ciphertext: Optional[str] = Field(None, description="Encrypted body (optional)")
+    nonce: Optional[str] = Field(None, description="Encryption nonce (optional)")
+    status: str = Field("sent", description="sent | delivered | read")
+    sent_at: Optional[datetime] = None
+    delivered_at: Optional[datetime] = None
+    read_at: Optional[datetime] = None
+
+
+class Contact(BaseModel):
+    user_id: str = Field(..., description="Owner user id")
+    contact_user_id: str = Field(..., description="The user id of the contact that also uses the app")
+    contact_name: Optional[str] = Field(None, description="Name from address book")
+    phone: str = Field(..., description="Raw phone in address book")
+
+
+class DeviceKey(BaseModel):
+    user_id: str
+    public_key: str = Field(..., description="Client public key for E2E (future)")
+    device_id: Optional[str] = Field(None)
+
+
+# Additional helper response models (not stored directly)
+class ChatSummary(BaseModel):
+    peer_user_id: str
+    last_text: Optional[str] = None
+    last_time: Optional[datetime] = None
+    unread_count: int = 0
